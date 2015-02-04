@@ -13,10 +13,12 @@ namespace TestApp
         static void Main(string[] args)
         {
 
-            long index = 11;
+            long index = 20;
             long indexItemsPerPage = 10;
 
             var indexPageIndex = index / (indexItemsPerPage+1);
+
+            var indexItemIndex = index % (indexItemsPerPage + 1);
 
 
             //var queue = new PersistentQueue.PersistentQueue();

@@ -9,9 +9,12 @@ namespace PersistentQueue
 {
     internal interface IPage
     {
+        long Index {get;}
         byte[] GetBytes(long position, long length);
+        Stream GetWriteStream(long position, long length);
         Stream GetWriteStream(long position);
+        Stream GetReadStream(long position, long length);
         Stream GetReadStream(long position);
-
+        void Dispose();
     }
 }
