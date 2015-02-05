@@ -12,12 +12,16 @@ namespace PersistentQueue
 {
     public class PersistentQueue : IDisposable
     {
-        MetaData _meta = new MetaData();
+        // Folders
+        readonly string QueuePath;
+        static readonly string MetaPageFolder = "meta";
+        static readonly string IndexPageFolder = "index";
+        static readonly string DataPageFolder = "data";
 
         // MetaData
         MetaData _metaData;
         readonly long MetaDataItemSize;
-        IPageFactory _metaDataFactory;
+        IPageFactory _metaPageFactory;
 
         // Tail info
         long _tailDataPageIndex;
@@ -39,14 +43,48 @@ namespace PersistentQueue
         static readonly long MinimumDataPageSize = 32 * 1024 * 1024;
         IPageFactory _dataPageFactory;
 
+        public PersistentQueue(string queuePath) : this(queuePath, DefaultDataPageSize) { }
 
-        public PersistentQueue()
+        public PersistentQueue(string queuePath, long pageSize)
         {
-            MetaDataItemSize = Marshal.SizeOf(typeof(MetaData));
-            IndexItemSize = Marshal.SizeOf(typeof(IndexItem));
+            QueuePath = queuePath;
+            DataPageSize = pageSize;
+
+            MetaDataItemSize = MetaData.Size();
+            IndexItemSize = IndexItem.Size();
             IndexPageSize = IndexItemSize * IndexItemsPerPage;
 
-            //_metaDataFactory = new Page
+            Init();
+        }
+
+        long CalculateSerializedSize(object o)
+        {
+            using (var ms = new MemoryStream())
+            {
+                new BinaryFormatter().Serialize(ms, o);
+                ms.Flush();
+                var bytes = ms.ToArray();
+                return ms.Length;
+            }
+        }
+
+        void Init()
+        {
+            // Init page factories
+            _metaPageFactory = new PageFactory(MetaDataItemSize, Path.Combine(QueuePath, MetaPageFolder)); // Page size = item size => only 1 item possible.
+            _indexPageFactory = new PageFactory(IndexPageSize, Path.Combine(QueuePath, IndexPageFolder));
+            _dataPageFactory = new PageFactory(DataPageSize, Path.Combine(QueuePath, DataPageFolder));
+
+            InitializeMetaData();
+        }
+
+        void InitializeMetaData()
+        {
+            var metaPage = _metaPageFactory.GetPage(0);
+            using (var readStream = metaPage.GetReadStream(0, MetaDataItemSize))
+            {
+                _metaData = MetaData.ReadFromStream(readStream);
+            }
         }
 
         long GetIndexPageIndex(long index)
@@ -65,17 +103,16 @@ namespace PersistentQueue
 
             using (var stream = indexPage.GetReadStream(indexItemOffset, IndexItemSize))
             {
-                return new BinaryFormatter().Deserialize(stream) as IndexItem;
+                return IndexItem.ReadFromStream(stream);
             }
         }
 
         void PersistMetaData()
         {
-            var metaPage = _metaDataFactory.GetPage(0);
+            var metaPage = _metaPageFactory.GetPage(0);
             using (var writeStream = metaPage.GetWriteStream(0, MetaDataItemSize))
             {
-                new BinaryFormatter().Serialize(writeStream, _metaData);
-                writeStream.Flush();
+                _metaData.WriteToStream(writeStream);
             }
         }
 
@@ -117,8 +154,7 @@ namespace PersistentQueue
                     ItemOffset = _tailDataItemOffset,
                     ItemLength = itemData.Length
                 };
-                new BinaryFormatter().Serialize(writeStream, indexItem);
-                writeStream.Flush();
+                indexItem.WriteToStream(writeStream);
             }
 
             // Advance

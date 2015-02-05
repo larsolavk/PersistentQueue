@@ -22,6 +22,9 @@ namespace PersistentQueue
             PageSize = pageSize;
             PageDir = pageDirectory;
 
+            if (!Directory.Exists(PageDir))
+                Directory.CreateDirectory(PageDir);
+
             // A simple cache that will will hold a number of pages based on a key. Typically one cached page for head and one for tail.
             _cache = new Dictionary<string, IPage>();       
         }

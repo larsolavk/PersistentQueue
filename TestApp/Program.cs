@@ -13,21 +13,23 @@ namespace TestApp
         static void Main(string[] args)
         {
 
-            long index = 20;
-            long indexItemsPerPage = 10;
+            //long index = 20;
+            //long indexItemsPerPage = 10;
 
-            var indexPageIndex = index / (indexItemsPerPage+1);
+            //var indexPageIndex = index / (indexItemsPerPage+1);
 
-            var indexItemIndex = index % (indexItemsPerPage + 1);
+            //var indexItemIndex = index % (indexItemsPerPage + 1);
 
 
-            //var queue = new PersistentQueue.PersistentQueue();
-            //var s = "Dette er en test";
+            var q = new PersistentQueue.PersistentQueue(@"c:\temp\PersistentQueue");
 
-            //using (var stream = GetStream(s))
-            //{
-            //    queue.Enqueue(stream);
-            //}
+
+            using (var ms = new MemoryStream())
+            using (var bw = new BinaryWriter(ms))
+            {
+                bw.Write("Dette er en test");
+                q.Enqueue(ms);
+            }
         }
 
 
