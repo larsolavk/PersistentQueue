@@ -14,14 +14,14 @@ namespace TestApp
         static void Main(string[] args)
         {
             var q = new PersistentQueue.PersistentQueue(@"c:\temp\PersistentQueue");
-            int items = 2000;
+            int items = 20000;
             var swOuter = new Stopwatch();
             var swInner = new Stopwatch();
             swOuter.Start();
             for (int i = 0; i < items; i++)
             {
 
-                using (var s = GetStream(String.Format("Dette er en test - linje {0}", i)))
+                using (var s = GetStream(String.Format("This is line number {0}. Just adding some more text to grow the item size", i)))
                 {
                     swInner.Start();                                     
                     q.Enqueue(s);
@@ -37,16 +37,29 @@ namespace TestApp
                 swInner.ElapsedMilliseconds,
                 ((double)items / swInner.ElapsedMilliseconds) * 1000);
 
+
             Stream stream;
+            swOuter.Reset();
+            swOuter.Start();
+            items = 0;
             while (null != (stream = q.Dequeue()))
             {
+                items++;
                 using (var br = new BinaryReader(stream))
                 {
                     var s = new string(br.ReadChars((int)stream.Length));
-                    Console.WriteLine(s);
+                    //Console.WriteLine(s);
                 }
                 stream.Dispose();
             }
+            swOuter.Stop();
+
+            Console.WriteLine("Dequeued {0} items in {1} ms ({2:0} items/s)",
+                items,
+                swOuter.ElapsedMilliseconds,
+                ((double)items / swOuter.ElapsedMilliseconds) * 1000);
+
+            Console.ReadLine();
         }
 
 

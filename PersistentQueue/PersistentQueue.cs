@@ -57,17 +57,6 @@ namespace PersistentQueue
             Init();
         }
 
-        long CalculateSerializedSize(object o)
-        {
-            using (var ms = new MemoryStream())
-            {
-                new BinaryFormatter().Serialize(ms, o);
-                ms.Flush();
-                var bytes = ms.ToArray();
-                return ms.Length;
-            }
-        }
-
         void Init()
         {
             // Init page factories
@@ -133,7 +122,7 @@ namespace PersistentQueue
             var dataPage = _dataPageFactory.GetPage(_tailDataPageIndex, TailCacheKey);
 
             // Get write stream
-            using (var writeStream = dataPage.GetWriteStream(_tailDataItemOffset))
+            using (var writeStream = dataPage.GetWriteStream(_tailDataItemOffset, itemData.Length))
             {
                 // Write data to write stream
                 itemData.CopyTo(writeStream, 128 * 1024);
@@ -197,6 +186,14 @@ namespace PersistentQueue
 
         public void Dispose()
         {
+            if (_metaPageFactory != null)
+                _metaPageFactory.Dispose();
+
+            if (_indexPageFactory != null)
+                _indexPageFactory.Dispose();
+
+            if (_dataPageFactory != null)
+                _dataPageFactory.Dispose();
         }
     }
 }

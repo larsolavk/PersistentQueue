@@ -7,7 +7,7 @@ using System.IO;
 
 namespace PersistentQueue
 {
-    internal class PageFactory : IPageFactory
+    internal class PageFactory : IPageFactory, IDisposable
     {
         static readonly string PageFileName = "page";
         static readonly string PageFileSuffix = ".dat";
@@ -73,6 +73,10 @@ namespace PersistentQueue
         public void DeletePage(long index)
         {
             throw new NotImplementedException();
+        }
+
+        public void Dispose()
+        {
         }
     }
 }
