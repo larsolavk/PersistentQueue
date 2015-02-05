@@ -5,6 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.IO;
 using PersistentQueue;
+using System.Diagnostics;
 
 namespace TestApp
 {
@@ -12,25 +13,29 @@ namespace TestApp
     {
         static void Main(string[] args)
         {
-
-            //long index = 20;
-            //long indexItemsPerPage = 10;
-
-            //var indexPageIndex = index / (indexItemsPerPage+1);
-
-            //var indexItemIndex = index % (indexItemsPerPage + 1);
-
-
             var q = new PersistentQueue.PersistentQueue(@"c:\temp\PersistentQueue");
-
-            
-            for (int i = 0; i < 20; i++)
+            int items = 2000;
+            var swOuter = new Stopwatch();
+            var swInner = new Stopwatch();
+            swOuter.Start();
+            for (int i = 0; i < items; i++)
             {
+
                 using (var s = GetStream(String.Format("Dette er en test - linje {0}", i)))
                 {
+                    swInner.Start();                                     
                     q.Enqueue(s);
+                    swInner.Stop();
                 }
             }
+            swOuter.Stop();
+
+            Console.WriteLine("Enqueued {0} items in {1} ms ({2:0} items/s). Inner: {3} ms ({4:0} items/s)",
+                items, 
+                swOuter.ElapsedMilliseconds, 
+                ((double)items / swOuter.ElapsedMilliseconds) * 1000, 
+                swInner.ElapsedMilliseconds,
+                ((double)items / swInner.ElapsedMilliseconds) * 1000);
 
             Stream stream;
             while (null != (stream = q.Dequeue()))

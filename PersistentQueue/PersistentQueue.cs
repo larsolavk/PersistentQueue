@@ -10,7 +10,7 @@ using System.Runtime.Serialization.Formatters.Binary;
 
 namespace PersistentQueue
 {
-    public class PersistentQueue : IDisposable
+    public sealed class PersistentQueue : IDisposable
     {
         // Folders
         readonly string QueuePath;
@@ -197,7 +197,6 @@ namespace PersistentQueue
 
         public void Dispose()
         {
-            throw new NotImplementedException();
         }
     }
 }
