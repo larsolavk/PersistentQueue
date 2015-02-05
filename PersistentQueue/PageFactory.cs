@@ -16,6 +16,7 @@ namespace PersistentQueue
         readonly string PageDir;
 
         Dictionary<string, IPage> _cache;
+        Dictionary<string, IPage> _pageCache;
 
         public PageFactory(long pageSize, string pageDirectory)
         {
@@ -26,7 +27,10 @@ namespace PersistentQueue
                 Directory.CreateDirectory(PageDir);
 
             // A simple cache that will will hold a number of pages based on a key. Typically one cached page for head and one for tail.
-            _cache = new Dictionary<string, IPage>();       
+            _cache = new Dictionary<string, IPage>();     
+  
+            // A simple cache using the page filename as key.
+            _pageCache = new Dictionary<string, IPage>();
         }
 
         string GetFilePath(long index)
@@ -38,14 +42,26 @@ namespace PersistentQueue
         {
             if (!_cache.ContainsKey(cacheKey) || _cache[cacheKey].Index != index)
             {
+                var filePath = GetFilePath(index);
+
                 // Dispose previously cached page
                 if (_cache.ContainsKey(cacheKey))
+                {
+                    _pageCache[filePath].Dispose();
+                    _pageCache.Remove(filePath);
+
                     _cache[cacheKey].Dispose();
+                    _cache.Remove(cacheKey);
+                }
 
                 // Open/create new page file and add it to cache
-                _cache[cacheKey] = new Page(GetFilePath(index), PageSize, index);
-            }
 
+                // Check first if the page is in the pageCache
+                if (!_pageCache.ContainsKey(filePath))
+                    _pageCache[filePath] = new Page(GetFilePath(index), PageSize, index);
+
+                _cache[cacheKey] = _pageCache[filePath];
+            }
             return _cache[cacheKey];
         }
 

@@ -93,7 +93,7 @@ namespace PersistentQueue
         }
         long GetIndexItemOffset(long index)
         {
-            return index % (IndexItemsPerPage + 1);
+            return (index % (IndexItemsPerPage + 1)) * IndexItemSize;
         }
 
         IndexItem GetIndexItem(long index, string cacheKey)
@@ -136,10 +136,9 @@ namespace PersistentQueue
             using (var writeStream = dataPage.GetWriteStream(_tailDataItemOffset))
             {
                 // Write data to write stream
-                itemData.CopyTo(writeStream);
-                writeStream.Flush();
+                itemData.CopyTo(writeStream, 128 * 1024);
+                //writeStream.Flush();
             }
-
 
             // Udate index
             // Get index page
@@ -181,7 +180,8 @@ namespace PersistentQueue
             using (var readStream = dataPage.GetReadStream(indexItem.ItemOffset, indexItem.ItemLength))
             {
                 readStream.CopyTo(memoryStream);
-                memoryStream.Flush();
+                memoryStream.Position = 0;
+                //memoryStream.Flush();
             }
 
             // Update meta data

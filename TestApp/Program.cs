@@ -23,12 +23,24 @@ namespace TestApp
 
             var q = new PersistentQueue.PersistentQueue(@"c:\temp\PersistentQueue");
 
-
-            using (var ms = new MemoryStream())
-            using (var bw = new BinaryWriter(ms))
+            
+            for (int i = 0; i < 20; i++)
             {
-                bw.Write("Dette er en test");
-                q.Enqueue(ms);
+                using (var s = GetStream(String.Format("Dette er en test - linje {0}", i)))
+                {
+                    q.Enqueue(s);
+                }
+            }
+
+            Stream stream;
+            while (null != (stream = q.Dequeue()))
+            {
+                using (var br = new BinaryReader(stream))
+                {
+                    var s = new string(br.ReadChars((int)stream.Length));
+                    Console.WriteLine(s);
+                }
+                stream.Dispose();
             }
         }
 

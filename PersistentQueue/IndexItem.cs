@@ -22,6 +22,7 @@ namespace PersistentQueue
                 bw.Write(DataPageIndex);
                 bw.Write(ItemOffset);
                 bw.Write(ItemLength);
+                //bw.Flush();
             }
         }
 
@@ -32,9 +33,9 @@ namespace PersistentQueue
             {
                 ret = new IndexItem
                 {
-                    DataPageIndex = br.Read(),
-                    ItemOffset = br.Read(),
-                    ItemLength = br.Read()
+                    DataPageIndex = br.ReadInt64(),
+                    ItemOffset = br.ReadInt64(),
+                    ItemLength = br.ReadInt64()
                 };
             }
             return ret;
