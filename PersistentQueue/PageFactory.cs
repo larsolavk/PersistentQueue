@@ -47,15 +47,17 @@ namespace PersistentQueue
                 // Dispose previously cached page
                 if (_cache.ContainsKey(cacheKey))
                 {
-                    _pageCache[filePath].Dispose();
-                    _pageCache.Remove(filePath);
-
+                    // Do we have a reference to this page in _pageCache as well? If so, remove it from pageCache
+                    var pageCacheKey = _pageCache.SingleOrDefault(o => object.ReferenceEquals(_cache[cacheKey], o.Value)).Key;
+                    if (pageCacheKey != null)
+                        _pageCache.Remove(pageCacheKey);
+                    
+                    // Dispose page and remove it from _cache for my cacheKey
                     _cache[cacheKey].Dispose();
                     _cache.Remove(cacheKey);
                 }
 
                 // Open/create new page file and add it to cache
-
                 // Check first if the page is in the pageCache
                 if (!_pageCache.ContainsKey(filePath))
                     _pageCache[filePath] = new Page(GetFilePath(index), PageSize, index);

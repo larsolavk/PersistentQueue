@@ -74,6 +74,11 @@ namespace PersistentQueue
             {
                 _metaData = MetaData.ReadFromStream(readStream);
             }
+
+            // Update local data pointers from previusly persisted index item
+            var prevIndexItem = GetPreviousIndexItem(_metaData.TailIndex, TailCacheKey);
+            _tailDataPageIndex = prevIndexItem.DataPageIndex;
+            _tailDataItemOffset = prevIndexItem.ItemOffset + prevIndexItem.ItemLength;
         }
 
         long GetIndexPageIndex(long index)
@@ -83,6 +88,15 @@ namespace PersistentQueue
         long GetIndexItemOffset(long index)
         {
             return (index % (IndexItemsPerPage + 1)) * IndexItemSize;
+        }
+
+        IndexItem GetPreviousIndexItem(long index, string cacheKey)
+        {
+            // TODO: Handle wrap situations
+            if (index > 0)
+                return GetIndexItem(index - 1, cacheKey);
+
+            return GetIndexItem(index, cacheKey);
         }
 
         IndexItem GetIndexItem(long index, string cacheKey)
@@ -107,6 +121,13 @@ namespace PersistentQueue
 
         public void Enqueue(Stream itemData)
         {
+            // Throw or silently return if itemData is null?
+            if (itemData == null)
+                return;
+
+            if (itemData.Length > DataPageSize)
+                throw new ArgumentOutOfRangeException("Item data length is greater than queue data page size");
+
             if (_tailDataItemOffset + itemData.Length > DataPageSize)       // Not enough space in current page
             {
                 if (_tailDataPageIndex == long.MaxValue)                    
@@ -117,7 +138,6 @@ namespace PersistentQueue
                 _tailDataItemOffset = 0;
             }
 
-
             // Get data page
             var dataPage = _dataPageFactory.GetPage(_tailDataPageIndex, TailCacheKey);
 
@@ -126,7 +146,6 @@ namespace PersistentQueue
             {
                 // Write data to write stream
                 itemData.CopyTo(writeStream, 128 * 1024);
-                //writeStream.Flush();
             }
 
             // Udate index
@@ -156,7 +175,7 @@ namespace PersistentQueue
         public Stream Dequeue()
         {
             if (_metaData.HeadIndex == _metaData.TailIndex)     // Head cought up with tail. Queue is empty.
-                return null;
+                return null;                                    // return null or Stream.Null?
 
             // Get index item for head index
             var indexItem = GetIndexItem(_metaData.HeadIndex, HeadCacheKey);
@@ -170,7 +189,6 @@ namespace PersistentQueue
             {
                 readStream.CopyTo(memoryStream);
                 memoryStream.Position = 0;
-                //memoryStream.Flush();
             }
 
             // Update meta data
