@@ -32,7 +32,7 @@ namespace PersistentQueue
         static readonly string HeadCacheKey = "_head_";
 
         // Index pages
-        static readonly long IndexItemsPerPage = 1024 * 1024;
+        static readonly long IndexItemsPerPage = 500000;
         readonly long IndexItemSize;
         readonly long IndexPageSize;
         IPageFactory _indexPageFactory;
@@ -83,16 +83,16 @@ namespace PersistentQueue
 
         long GetIndexPageIndex(long index)
         {
-            return index / (IndexItemsPerPage + 1);
+            return index / IndexItemsPerPage;
         }
         long GetIndexItemOffset(long index)
         {
-            return (index % (IndexItemsPerPage + 1)) * IndexItemSize;
+            return (index % IndexItemsPerPage) * IndexItemSize;
         }
 
         IndexItem GetPreviousIndexItem(long index, string cacheKey)
         {
-            // TODO: Handle wrap situations
+            // TODO: Handle wrap situations => index == Int64.MaxValue
             if (index > 0)
                 return GetIndexItem(index - 1, cacheKey);
 
