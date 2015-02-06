@@ -92,7 +92,7 @@ namespace PersistentQueue
 
         IndexItem GetPreviousIndexItem(long index, string cacheKey)
         {
-            // TODO: Handle wrap situations => index == Int64.MaxValue
+            // TODO: Handle wrap situations => index == long.MaxValue
             if (index > 0)
                 return GetIndexItem(index - 1, cacheKey);
 
@@ -168,7 +168,10 @@ namespace PersistentQueue
             _tailDataItemOffset += itemData.Length;
 
             // Update meta data
-            _metaData.TailIndex++;
+            if (_metaData.TailIndex == long.MaxValue)
+                _metaData.TailIndex = 0;
+            else
+                _metaData.TailIndex++;
             PersistMetaData();
         }
 
