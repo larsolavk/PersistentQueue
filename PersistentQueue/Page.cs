@@ -10,6 +10,7 @@ namespace PersistentQueue
 {
     internal class Page : IPage, IDisposable
     {
+        bool disposed = false;
         MemoryMappedFile _mmf;
 
         public long Index { get; private set; }
@@ -32,8 +33,26 @@ namespace PersistentQueue
 
         public void Dispose()
         {
-            if (_mmf != null)
-                _mmf.Dispose();
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
+        protected void Dispose(bool disposing)
+        {
+            if (disposed)
+                return;
+
+            if (disposing)
+            {
+                if (_mmf != null)
+                    _mmf.Dispose();
+            }
+            disposed = true;
+        }
+
+        ~Page()
+        {
+            Dispose(false);
         }
     }
 }

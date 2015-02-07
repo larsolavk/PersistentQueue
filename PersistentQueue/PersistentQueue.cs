@@ -10,8 +10,9 @@ using System.Runtime.Serialization.Formatters.Binary;
 
 namespace PersistentQueue
 {
-    public sealed class PersistentQueue : IDisposable
+    public class PersistentQueue : IDisposable
     {
+        bool disposed = false;
         // Folders
         readonly string QueuePath;
         static readonly string MetaPageFolder = "meta";
@@ -32,7 +33,7 @@ namespace PersistentQueue
         static readonly string HeadCacheKey = "_head_";
 
         // Index pages
-        static readonly long IndexItemsPerPage = 500000;
+        static readonly long IndexItemsPerPage = 50000;
         readonly long IndexItemSize;
         readonly long IndexPageSize;
         IPageFactory _indexPageFactory;
@@ -207,14 +208,32 @@ namespace PersistentQueue
 
         public void Dispose()
         {
-            if (_metaPageFactory != null)
-                _metaPageFactory.Dispose();
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
 
-            if (_indexPageFactory != null)
-                _indexPageFactory.Dispose();
+        protected void Dispose(bool disposing)
+        {
+            if (disposed)
+                return;
 
-            if (_dataPageFactory != null)
-                _dataPageFactory.Dispose();
+            if (disposing)
+            {
+                if (_metaPageFactory != null)
+                    _metaPageFactory.Dispose();
+
+                if (_indexPageFactory != null)
+                    _indexPageFactory.Dispose();
+
+                if (_dataPageFactory != null)
+                    _dataPageFactory.Dispose();
+            }
+            disposed = true;
+        }
+
+        ~PersistentQueue()
+        {
+            Dispose(false);
         }
     }
 }

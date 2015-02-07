@@ -9,6 +9,7 @@ namespace PersistentQueue
 {
     internal class PageFactory : IPageFactory, IDisposable
     {
+        bool disposed = false;
         static readonly string PageFileName = "page";
         static readonly string PageFileSuffix = ".dat";
         static readonly string DefaultCacheKey = "_default_";
@@ -79,6 +80,32 @@ namespace PersistentQueue
 
         public void Dispose()
         {
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
+        protected void Dispose(bool disposing)
+        {
+            if (disposed)
+                return;
+
+            if (disposing)
+            {
+                if (_pageCache != null)
+                {
+                    foreach (var p in _pageCache)
+                    {
+                        if (p.Value != null)
+                            p.Value.Dispose();
+                    }
+                }
+            }
+            disposed = true;
+        }
+
+        ~PageFactory()
+        {
+            Dispose(false);
         }
     }
 }
