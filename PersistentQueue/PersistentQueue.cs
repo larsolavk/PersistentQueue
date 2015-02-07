@@ -146,7 +146,7 @@ namespace PersistentQueue
             using (var writeStream = dataPage.GetWriteStream(_tailDataItemOffset, itemData.Length))
             {
                 // Write data to write stream
-                itemData.CopyTo(writeStream, 128 * 1024);
+                itemData.CopyTo(writeStream, 4*1024);
             }
 
             // Udate index
@@ -191,7 +191,7 @@ namespace PersistentQueue
             MemoryStream memoryStream = new MemoryStream();
             using (var readStream = dataPage.GetReadStream(indexItem.ItemOffset, indexItem.ItemLength))
             {
-                readStream.CopyTo(memoryStream);
+                readStream.CopyTo(memoryStream, 4*1024);
                 memoryStream.Position = 0;
             }
 

@@ -80,7 +80,7 @@ namespace TestApp
                 swOuter.ElapsedMilliseconds,
                 ((double)items / swOuter.ElapsedMilliseconds) * 1000);
 
-            Console.ReadLine();
+            //Console.ReadLine();
         }
 
 
