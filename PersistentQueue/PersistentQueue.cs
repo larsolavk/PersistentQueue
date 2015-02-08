@@ -28,6 +28,9 @@ namespace PersistentQueue
         long _tailDataPageIndex;
         long _tailDataItemOffset;
 
+        // Head info
+        long _headDataPageIndex;
+
         // Cache keys
         static readonly string TailCacheKey = "_tail_";
         static readonly string HeadCacheKey = "_head_";
@@ -77,9 +80,12 @@ namespace PersistentQueue
             }
 
             // Update local data pointers from previusly persisted index item
-            var prevIndexItem = GetPreviousIndexItem(_metaData.TailIndex, TailCacheKey);
-            _tailDataPageIndex = prevIndexItem.DataPageIndex;
-            _tailDataItemOffset = prevIndexItem.ItemOffset + prevIndexItem.ItemLength;
+            var prevTailIndexItem = GetPreviousIndexItem(_metaData.TailIndex, TailCacheKey);
+            _tailDataPageIndex = prevTailIndexItem.DataPageIndex;
+            _tailDataItemOffset = prevTailIndexItem.ItemOffset + prevTailIndexItem.ItemLength;
+
+            var prevHeadIndexItem = GetPreviousIndexItem(_metaData.HeadIndex, HeadCacheKey);
+            _headDataPageIndex = prevHeadIndexItem.DataPageIndex;
         }
 
         long GetIndexPageIndex(long index)
@@ -183,6 +189,14 @@ namespace PersistentQueue
 
             // Get index item for head index
             var indexItem = GetIndexItem(_metaData.HeadIndex, HeadCacheKey);
+
+            // Delete previous data page if we are moving along to the next
+            if (indexItem.DataPageIndex != _headDataPageIndex)
+            {
+                var prevPage = _dataPageFactory.GetPage(_headDataPageIndex, HeadCacheKey);
+                prevPage.Delete();
+                _headDataPageIndex = indexItem.DataPageIndex;
+            }
 
             // Get data page
             var dataPage = _dataPageFactory.GetPage(indexItem.DataPageIndex, HeadCacheKey);

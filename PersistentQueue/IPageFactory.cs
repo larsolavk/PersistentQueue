@@ -12,8 +12,6 @@ namespace PersistentQueue
 
         IPage GetPage(long index, string cacheKey);
 
-        void DeletePage(long index);
-
         void Dispose();
     }
 }

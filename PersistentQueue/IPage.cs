@@ -12,6 +12,7 @@ namespace PersistentQueue
         long Index {get;}
         Stream GetWriteStream(long position, long length);
         Stream GetReadStream(long position, long length);
+        void Delete();
         void Dispose();
     }
 }

@@ -11,12 +11,14 @@ namespace PersistentQueue
     internal class Page : IPage, IDisposable
     {
         bool disposed = false;
+        string _pageFile;
         MemoryMappedFile _mmf;
 
         public long Index { get; private set; }
 
         public Page(string pageFile, long pageSize, long pageIndex)
         {
+            _pageFile = pageFile;
             Index = pageIndex;
             _mmf = MemoryMappedFile.CreateFromFile(pageFile, System.IO.FileMode.OpenOrCreate, null, pageSize, MemoryMappedFileAccess.ReadWrite);
         }
@@ -29,6 +31,14 @@ namespace PersistentQueue
         public Stream GetWriteStream(long position, long length)
         {
             return _mmf.CreateViewStream(position, length, MemoryMappedFileAccess.Write);
+        }
+
+        public void Delete()
+        {
+            Dispose();
+
+            if (File.Exists(_pageFile))
+                File.Delete(_pageFile);
         }
 
         public void Dispose()

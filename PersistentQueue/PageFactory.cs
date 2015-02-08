@@ -73,11 +73,6 @@ namespace PersistentQueue
             return GetPage(index, DefaultCacheKey);
         }
 
-        public void DeletePage(long index)
-        {
-            throw new NotImplementedException();
-        }
-
         public void Dispose()
         {
             Dispose(true);

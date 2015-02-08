@@ -22,7 +22,7 @@ namespace TestApp
             {
                 using (var s = GetStream(String.Format("This is line number {0}. Just adding some more text to grow the item size", i)))
                 {
-                    swInner.Start();                                     
+                    swInner.Start();
                     q.Enqueue(s);
                     swInner.Stop();
                 }
@@ -30,9 +30,9 @@ namespace TestApp
             swOuter.Stop();
 
             Console.WriteLine("Enqueued {0} items in {1} ms ({2:0} items/s). Inner: {3} ms ({4:0} items/s)",
-                items, 
-                swOuter.ElapsedMilliseconds, 
-                ((double)items / swOuter.ElapsedMilliseconds) * 1000, 
+                items,
+                swOuter.ElapsedMilliseconds,
+                ((double)items / swOuter.ElapsedMilliseconds) * 1000,
                 swInner.ElapsedMilliseconds,
                 ((double)items / swInner.ElapsedMilliseconds) * 1000);
 
