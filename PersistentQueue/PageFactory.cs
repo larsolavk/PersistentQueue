@@ -53,9 +53,13 @@ namespace PersistentQueue
                     if (pageCacheKey != null)
                         _pageCache.Remove(pageCacheKey);
                     
-                    // Dispose page and remove it from _cache for my cacheKey
-                    _cache[cacheKey].Dispose();
-                    _cache.Remove(cacheKey);
+                    // Remove page from all cache (for all keys), the dispose it
+                    var pageToDispose = _cache[cacheKey];
+                    foreach (var kvp in _cache.Where(p => object.ReferenceEquals(pageToDispose, p.Value)).ToArray())
+                    {
+                        _cache.Remove(kvp.Key);
+                    }
+                    pageToDispose.Dispose();
                 }
 
                 // Open/create new page file and add it to cache
@@ -71,6 +75,29 @@ namespace PersistentQueue
         public IPage GetPage(long index)
         {
             return GetPage(index, DefaultCacheKey);
+        }
+
+        public void DeletePage(long index)
+        {
+            IPage page;
+            var filePath = GetFilePath(index);
+            
+            // Lookup page in _pageCache.
+            if (_pageCache.TryGetValue(filePath, out page))
+            {
+                // Remove from _cache if referenced
+                var cacheKey = _cache.SingleOrDefault(o => object.ReferenceEquals(page, o.Value)).Key;
+                if (cacheKey != null)
+                    _cache.Remove(cacheKey);
+                
+                page.Delete();
+                _pageCache.Remove(filePath);
+            }
+            else
+            {
+                // If not found in cache, delete the file directly.
+                Page.DeleteFile(filePath);
+            }
         }
 
         public void Dispose()

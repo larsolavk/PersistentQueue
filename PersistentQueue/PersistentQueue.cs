@@ -30,6 +30,7 @@ namespace PersistentQueue
 
         // Head info
         long _headDataPageIndex;
+        long _headIndexPageIndex;
 
         // Cache keys
         static readonly string TailCacheKey = "_tail_";
@@ -79,13 +80,14 @@ namespace PersistentQueue
                 _metaData = MetaData.ReadFromStream(readStream);
             }
 
-            // Update local data pointers from previusly persisted index item
-            var prevTailIndexItem = GetPreviousIndexItem(_metaData.TailIndex, TailCacheKey);
+            // Update local data pointers from previously persisted index item
+            var prevTailIndexItem = GetIndexItem(GetPreviousIndex(_metaData.TailIndex), TailCacheKey);
             _tailDataPageIndex = prevTailIndexItem.DataPageIndex;
             _tailDataItemOffset = prevTailIndexItem.ItemOffset + prevTailIndexItem.ItemLength;
 
-            var prevHeadIndexItem = GetPreviousIndexItem(_metaData.HeadIndex, HeadCacheKey);
+            var prevHeadIndexItem = GetIndexItem(GetPreviousIndex(_metaData.HeadIndex), HeadCacheKey);
             _headDataPageIndex = prevHeadIndexItem.DataPageIndex;
+            _headIndexPageIndex = GetIndexPageIndex(GetPreviousIndex(_metaData.HeadIndex));
         }
 
         long GetIndexPageIndex(long index)
@@ -97,13 +99,13 @@ namespace PersistentQueue
             return (index % IndexItemsPerPage) * IndexItemSize;
         }
 
-        IndexItem GetPreviousIndexItem(long index, string cacheKey)
+        long GetPreviousIndex(long index)
         {
             // TODO: Handle wrap situations => index == long.MaxValue
             if (index > 0)
-                return GetIndexItem(index - 1, cacheKey);
-
-            return GetIndexItem(index, cacheKey);
+                return index - 1;
+            
+            return index;
         }
 
         IndexItem GetIndexItem(long index, string cacheKey)
@@ -187,14 +189,20 @@ namespace PersistentQueue
             if (_metaData.HeadIndex == _metaData.TailIndex)     // Head cought up with tail. Queue is empty.
                 return null;                                    // return null or Stream.Null?
 
+            // Delete previous index page if we are moving along to the next
+            if (GetIndexPageIndex(_metaData.HeadIndex) != _headIndexPageIndex)
+            {
+                _indexPageFactory.DeletePage(_headIndexPageIndex);
+                _headIndexPageIndex = GetIndexPageIndex(_metaData.HeadIndex);
+            }
+
             // Get index item for head index
             var indexItem = GetIndexItem(_metaData.HeadIndex, HeadCacheKey);
 
             // Delete previous data page if we are moving along to the next
             if (indexItem.DataPageIndex != _headDataPageIndex)
             {
-                var prevPage = _dataPageFactory.GetPage(_headDataPageIndex, HeadCacheKey);
-                prevPage.Delete();
+                _dataPageFactory.DeletePage(_headDataPageIndex);
                 _headDataPageIndex = indexItem.DataPageIndex;
             }
 

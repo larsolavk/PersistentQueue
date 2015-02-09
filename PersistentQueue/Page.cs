@@ -36,9 +36,18 @@ namespace PersistentQueue
         public void Delete()
         {
             Dispose();
+            DeleteFile(_pageFile);
+        }
 
-            if (File.Exists(_pageFile))
-                File.Delete(_pageFile);
+        public static void DeleteFile(string filePath)
+        {
+            if (File.Exists(filePath))
+                File.Delete(filePath);
+        }
+
+        void IPage.DeleteFile(string filePath)
+        {
+            Page.DeleteFile(filePath);
         }
 
         public void Dispose()

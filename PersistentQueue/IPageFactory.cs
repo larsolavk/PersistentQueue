@@ -9,9 +9,8 @@ namespace PersistentQueue
     internal interface IPageFactory
     {
         IPage GetPage(long index);
-
         IPage GetPage(long index, string cacheKey);
-
+        void DeletePage(long index);
         void Dispose();
     }
 }

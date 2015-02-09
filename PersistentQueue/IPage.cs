@@ -13,6 +13,7 @@ namespace PersistentQueue
         Stream GetWriteStream(long position, long length);
         Stream GetReadStream(long position, long length);
         void Delete();
+        void DeleteFile(string filePath);
         void Dispose();
     }
 }
