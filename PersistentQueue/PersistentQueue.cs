@@ -32,10 +32,6 @@ namespace PersistentQueue
         long _headDataPageIndex;
         long _headIndexPageIndex;
 
-        // Cache keys
-        static readonly string TailCacheKey = "_tail_";
-        static readonly string HeadCacheKey = "_head_";
-
         // Index pages
         static readonly long IndexItemsPerPage = 50000;
         readonly long IndexItemSize;
@@ -47,6 +43,13 @@ namespace PersistentQueue
         static readonly long DefaultDataPageSize = 128 * 1024 * 1024;
         static readonly long MinimumDataPageSize = 32 * 1024 * 1024;
         IPageFactory _dataPageFactory;
+
+        // local caching of index- and data pages for head and tail
+        IPage _headIndexPage;
+        IPage _tailIndexPage;
+
+        IPage _headDataPage;
+        IPage _tailDataPage;
 
         public PersistentQueue(string queuePath) : this(queuePath, DefaultDataPageSize) { }
 
@@ -81,11 +84,15 @@ namespace PersistentQueue
             }
 
             // Update local data pointers from previously persisted index item
-            var prevTailIndexItem = GetIndexItem(GetPreviousIndex(_metaData.TailIndex), TailCacheKey);
+            var prevTailIndex = GetPreviousIndex(_metaData.TailIndex);
+            _tailIndexPage = GetTailIndexPage(GetIndexPageIndex(prevTailIndex));
+            var prevTailIndexItem = GetIndexItem(_tailIndexPage, GetIndexItemOffset(prevTailIndex));
             _tailDataPageIndex = prevTailIndexItem.DataPageIndex;
             _tailDataItemOffset = prevTailIndexItem.ItemOffset + prevTailIndexItem.ItemLength;
 
-            var prevHeadIndexItem = GetIndexItem(GetPreviousIndex(_metaData.HeadIndex), HeadCacheKey);
+            var prevHeadIndex = GetPreviousIndex(_metaData.HeadIndex);
+            _headIndexPage = GetHeadIndexPage(GetIndexPageIndex(prevHeadIndex));
+            var prevHeadIndexItem = GetIndexItem(_headIndexPage, GetIndexItemOffset(prevHeadIndex));
             _headDataPageIndex = prevHeadIndexItem.DataPageIndex;
             _headIndexPageIndex = GetIndexPageIndex(GetPreviousIndex(_metaData.HeadIndex));
         }
@@ -108,15 +115,28 @@ namespace PersistentQueue
             return index;
         }
 
-        IndexItem GetIndexItem(long index, string cacheKey)
+        IndexItem GetIndexItem(IPage indexPage, long indexItemOffset)
         {
-            var indexPage = _indexPageFactory.GetPage(GetIndexPageIndex(index), cacheKey);
-            var indexItemOffset = GetIndexItemOffset(index);
-
             using (var stream = indexPage.GetReadStream(indexItemOffset, IndexItemSize))
             {
                 return IndexItem.ReadFromStream(stream);
             }
+        }
+
+        IndexItem GetTailIndexItem(long index)
+        {
+            var indexPage = GetTailIndexPage(GetIndexPageIndex(index));
+            var indexItemOffset = GetIndexItemOffset(index);
+
+            return GetIndexItem(indexPage, indexItemOffset);
+        }
+
+        IndexItem GetHeadIndexItem(long index)
+        {
+            var indexPage = GetHeadIndexPage(GetIndexPageIndex(index));
+            var indexItemOffset = GetIndexItemOffset(index);
+
+            return GetIndexItem(indexPage, indexItemOffset);
         }
 
         void PersistMetaData()
@@ -126,6 +146,60 @@ namespace PersistentQueue
             {
                 _metaData.WriteToStream(writeStream);
             }
+        }
+
+        IPage GetHeadDataPage(long dataPageindex)
+        {
+            if (_headDataPage != null && _headDataPage.Index == dataPageindex)
+                return _headDataPage;
+
+            return _headDataPage = _dataPageFactory.GetPage(dataPageindex);
+        }
+
+        IPage GetTailDataPage(long dataPageindex)
+        {
+            if (_tailDataPage != null && _tailDataPage.Index == dataPageindex)
+                return _tailDataPage;
+
+            return _tailDataPage = _dataPageFactory.GetPage(dataPageindex);
+        }
+
+        void DeleteDataPage(long dataPageIndex)
+        {
+            if (_headDataPage != null && _headDataPage.Index == dataPageIndex)
+                _headDataPage = null;
+
+            if (_tailDataPage != null && _tailDataPage.Index == dataPageIndex)
+                _tailDataPage = null;
+
+            _dataPageFactory.DeletePage(dataPageIndex);
+        }
+
+        IPage GetHeadIndexPage(long indexPageIndex)
+        {
+            if (_headIndexPage != null && _headIndexPage.Index == indexPageIndex)
+                return _headIndexPage;
+
+            return _headIndexPage = _indexPageFactory.GetPage(indexPageIndex);
+        }
+
+        IPage GetTailIndexPage(long indexPageIndex)
+        {
+            if (_tailIndexPage != null && _tailIndexPage.Index == indexPageIndex)
+                return _tailIndexPage;
+
+            return _tailIndexPage = _indexPageFactory.GetPage(indexPageIndex);
+        }
+
+        void DeleteIndexPage(long indexPageIndex)
+        {
+            if (_headIndexPage != null && _headIndexPage.Index == indexPageIndex)
+                _headIndexPage = null;
+
+            if (_tailIndexPage != null && _tailIndexPage.Index == indexPageIndex)
+                _tailIndexPage = null;
+
+            _indexPageFactory.DeletePage(indexPageIndex);
         }
 
         public void Enqueue(Stream itemData)
@@ -148,7 +222,7 @@ namespace PersistentQueue
             }
 
             // Get data page
-            var dataPage = _dataPageFactory.GetPage(_tailDataPageIndex, TailCacheKey);
+            var dataPage = GetTailDataPage(_tailDataPageIndex);
 
             // Get write stream
             using (var writeStream = dataPage.GetWriteStream(_tailDataItemOffset, itemData.Length))
@@ -159,7 +233,7 @@ namespace PersistentQueue
 
             // Udate index
             // Get index page
-            var indexPage = _indexPageFactory.GetPage(GetIndexPageIndex(_metaData.TailIndex), TailCacheKey);
+            var indexPage = GetTailIndexPage(GetIndexPageIndex(_metaData.TailIndex));
 
             // Get write stream
             using (var writeStream = indexPage.GetWriteStream(GetIndexItemOffset(_metaData.TailIndex), IndexItemSize))
@@ -192,22 +266,22 @@ namespace PersistentQueue
             // Delete previous index page if we are moving along to the next
             if (GetIndexPageIndex(_metaData.HeadIndex) != _headIndexPageIndex)
             {
-                _indexPageFactory.DeletePage(_headIndexPageIndex);
+                DeleteIndexPage(_headIndexPageIndex);
                 _headIndexPageIndex = GetIndexPageIndex(_metaData.HeadIndex);
             }
 
             // Get index item for head index
-            var indexItem = GetIndexItem(_metaData.HeadIndex, HeadCacheKey);
+            var indexItem = GetHeadIndexItem(_metaData.HeadIndex);
 
             // Delete previous data page if we are moving along to the next
             if (indexItem.DataPageIndex != _headDataPageIndex)
             {
-                _dataPageFactory.DeletePage(_headDataPageIndex);
+                DeleteDataPage(_headDataPageIndex);
                 _headDataPageIndex = indexItem.DataPageIndex;
             }
 
             // Get data page
-            var dataPage = _dataPageFactory.GetPage(indexItem.DataPageIndex, HeadCacheKey);
+            var dataPage = GetHeadDataPage(indexItem.DataPageIndex);
 
             // Get read stream
             MemoryStream memoryStream = new MemoryStream();
