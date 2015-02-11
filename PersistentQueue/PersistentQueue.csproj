@@ -39,6 +39,9 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Cache\Cache.cs" />
+    <Compile Include="Cache\ICache.cs" />
+    <Compile Include="Cache\TTLValue.cs" />
     <Compile Include="Page.cs" />
     <Compile Include="IndexItem.cs" />
     <Compile Include="IPageFactory.cs" />

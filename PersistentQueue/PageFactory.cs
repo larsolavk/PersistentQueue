@@ -4,20 +4,19 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.IO;
+using PersistentQueue.Cache;
 
 namespace PersistentQueue
 {
-    internal class PageFactory : IPageFactory, IDisposable
+    internal class PageFactory : IPageFactory
     {
         bool disposed = false;
         static readonly string PageFileName = "page";
         static readonly string PageFileSuffix = ".dat";
         readonly long PageSize;
         readonly string PageDir;
+        Cache<string, IPage> _pageCache;
 
-        Dictionary<string, IPage> _pageCache;
-
-        // TODO: Remove pages from cache... When? How? Another cleaner thread/task?
         public PageFactory(long pageSize, string pageDirectory)
         {
             PageSize = pageSize;
@@ -27,7 +26,7 @@ namespace PersistentQueue
                 Directory.CreateDirectory(PageDir);
 
             // A simple cache using the page filename as key.
-            _pageCache = new Dictionary<string, IPage>();
+            _pageCache = new Cache<string, IPage>(10000);
         }
 
         string GetFilePath(long index)
@@ -46,6 +45,12 @@ namespace PersistentQueue
             }
             
             return page;
+        }
+
+        public void ReleasePage(long index)
+        {
+            var filePath = GetFilePath(index);
+            _pageCache.Release(filePath);
         }
 
         public void DeletePage(long index)
@@ -81,13 +86,7 @@ namespace PersistentQueue
             if (disposing)
             {
                 if (_pageCache != null)
-                {
-                    foreach (var p in _pageCache)
-                    {
-                        if (p.Value != null)
-                            p.Value.Dispose();
-                    }
-                }
+                    _pageCache.RemoveAll();
             }
             disposed = true;
         }

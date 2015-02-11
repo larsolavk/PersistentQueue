@@ -8,7 +8,7 @@ using System.IO;
 
 namespace PersistentQueue
 {
-    internal class Page : IPage, IDisposable
+    internal class Page : IPage
     {
         bool disposed = false;
         string _pageFile;
