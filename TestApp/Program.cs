@@ -40,6 +40,7 @@ namespace TestApp
 
             Stream stream;
             swOuter.Reset();
+            swInner.Reset();
             swOuter.Start();
             items = 0;
 
@@ -61,24 +62,32 @@ namespace TestApp
 
 
             // Get all items from queue
-            while (null != (stream = q.Dequeue()))
+            do
             {
-                items++;
-                using (var br = new BinaryReader(stream))
+                swInner.Start();
+                using (stream = q.Dequeue())
                 {
-                    var s = new string(br.ReadChars((int)stream.Length));
-                    //Console.WriteLine(s);
+                    swInner.Stop();
+                    if (stream != null)
+                    {
+                        items++;
+
+                        using (var br = new BinaryReader(stream))
+                        {
+                            var s = new string(br.ReadChars((int)stream.Length));
+                            //Console.WriteLine(s);
+                        }
+                    }
                 }
-                stream.Dispose();
             }
-
+            while (stream != null);
                 
-            swOuter.Stop();
-
-            Console.WriteLine("Dequeued {0} items in {1} ms ({2:0} items/s)",
+            Console.WriteLine("Dequeued {0} items in {1} ms ({2:0} items/s). Inner: {3} ms ({4:0} items/s)",
                 items,
                 swOuter.ElapsedMilliseconds,
-                ((double)items / swOuter.ElapsedMilliseconds) * 1000);
+                ((double)items / swOuter.ElapsedMilliseconds) * 1000,
+                swInner.ElapsedMilliseconds,
+                ((double)items / swInner.ElapsedMilliseconds) * 1000);
 
             //Console.ReadLine();
         }
