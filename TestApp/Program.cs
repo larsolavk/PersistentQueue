@@ -13,6 +13,8 @@ namespace TestApp
     {
         static void Main(string[] args)
         {
+            Console.WriteLine("TADA");
+
             var q = new PersistentQueue.PersistentQueue(@"c:\temp\PersistentQueue", 10*1024*1024);
             int items = 50000;
             var swOuter = new Stopwatch();
