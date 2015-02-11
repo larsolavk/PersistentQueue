@@ -46,7 +46,6 @@
     <Compile Include="IndexItem.cs" />
     <Compile Include="IPageFactory.cs" />
     <Compile Include="IPage.cs" />
-    <Compile Include="ISerializer.cs" />
     <Compile Include="MetaData.cs" />
     <Compile Include="PageFactory.cs" />
     <Compile Include="PersistentQueue.cs" />
