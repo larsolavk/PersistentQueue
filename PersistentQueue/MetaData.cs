@@ -8,8 +8,6 @@ using System.IO;
 
 namespace PersistentQueue
 {
-    [Serializable]
-    [StructLayout(LayoutKind.Sequential, Pack=1)]
     internal class MetaData
     {
         public long HeadIndex { get; set; }

@@ -8,7 +8,6 @@ using System.IO;
 
 namespace PersistentQueue
 {
-    [StructLayout(LayoutKind.Sequential, Pack = 1)]
     internal class IndexItem
     {
         public long DataPageIndex { get; set; }
