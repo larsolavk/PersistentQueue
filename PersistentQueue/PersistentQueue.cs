@@ -44,6 +44,8 @@ namespace PersistentQueue
         static readonly long MinimumDataPageSize = 32 * 1024 * 1024;
         IPageFactory _dataPageFactory;
 
+        Object _lockObject = new Object();
+
         public PersistentQueue(string queuePath) : this(queuePath, DefaultDataPageSize) { }
 
         public PersistentQueue(string queuePath, long pageSize)
@@ -131,109 +133,115 @@ namespace PersistentQueue
 
         public void Enqueue(Stream itemData)
         {
-            // Throw or silently return if itemData is null?
-            if (itemData == null)
-                return;
-
-            if (itemData.Length > DataPageSize)
-                throw new ArgumentOutOfRangeException("Item data length is greater than queue data page size");
-
-            if (_tailDataItemOffset + itemData.Length > DataPageSize)       // Not enough space in current page
+            lock (_lockObject)
             {
-                if (_tailDataPageIndex == long.MaxValue)                    
-                    _tailDataPageIndex = 0;
-                else
-                    _tailDataPageIndex++;
+                // Throw or silently return if itemData is null?
+                if (itemData == null)
+                    return;
 
-                _tailDataItemOffset = 0;
-            }
+                if (itemData.Length > DataPageSize)
+                    throw new ArgumentOutOfRangeException("Item data length is greater than queue data page size");
 
-            // Get data page
-            var dataPage = _dataPageFactory.GetPage(_tailDataPageIndex);
-
-            // Get write stream
-            using (var writeStream = dataPage.GetWriteStream(_tailDataItemOffset, itemData.Length))
-            {
-                // Write data to write stream
-                itemData.CopyTo(writeStream, 4*1024);
-            }
-
-            // Release our reference to the data page
-            _dataPageFactory.ReleasePage(_tailDataPageIndex);
-
-            // Udate index
-            // Get index page
-            var indexPage = _indexPageFactory.GetPage(GetIndexPageIndex(_metaData.TailIndex));
-
-            // Get write stream
-            using (var writeStream = indexPage.GetWriteStream(GetIndexItemOffset(_metaData.TailIndex), IndexItemSize))
-            {
-                var indexItem = new IndexItem
+                if (_tailDataItemOffset + itemData.Length > DataPageSize)       // Not enough space in current page
                 {
-                    DataPageIndex = _tailDataPageIndex,
-                    ItemOffset = _tailDataItemOffset,
-                    ItemLength = itemData.Length
-                };
-                indexItem.WriteToStream(writeStream);
+                    if (_tailDataPageIndex == long.MaxValue)
+                        _tailDataPageIndex = 0;
+                    else
+                        _tailDataPageIndex++;
+
+                    _tailDataItemOffset = 0;
+                }
+
+                // Get data page
+                var dataPage = _dataPageFactory.GetPage(_tailDataPageIndex);
+
+                // Get write stream
+                using (var writeStream = dataPage.GetWriteStream(_tailDataItemOffset, itemData.Length))
+                {
+                    // Write data to write stream
+                    itemData.CopyTo(writeStream, 4 * 1024);
+                }
+
+                // Release our reference to the data page
+                _dataPageFactory.ReleasePage(_tailDataPageIndex);
+
+                // Udate index
+                // Get index page
+                var indexPage = _indexPageFactory.GetPage(GetIndexPageIndex(_metaData.TailIndex));
+
+                // Get write stream
+                using (var writeStream = indexPage.GetWriteStream(GetIndexItemOffset(_metaData.TailIndex), IndexItemSize))
+                {
+                    var indexItem = new IndexItem
+                    {
+                        DataPageIndex = _tailDataPageIndex,
+                        ItemOffset = _tailDataItemOffset,
+                        ItemLength = itemData.Length
+                    };
+                    indexItem.WriteToStream(writeStream);
+                }
+
+                _indexPageFactory.ReleasePage(GetIndexPageIndex(_metaData.TailIndex));
+
+                // Advance
+                _tailDataItemOffset += itemData.Length;
+
+                // Update meta data
+                if (_metaData.TailIndex == long.MaxValue)
+                    _metaData.TailIndex = 0;
+                else
+                    _metaData.TailIndex++;
+                PersistMetaData();
             }
-
-            _indexPageFactory.ReleasePage(GetIndexPageIndex(_metaData.TailIndex));
-
-            // Advance
-            _tailDataItemOffset += itemData.Length;
-
-            // Update meta data
-            if (_metaData.TailIndex == long.MaxValue)
-                _metaData.TailIndex = 0;
-            else
-                _metaData.TailIndex++;
-            PersistMetaData();
         }
 
         public Stream Dequeue()
         {
-            if (_metaData.HeadIndex == _metaData.TailIndex)     // Head cought up with tail. Queue is empty.
-                return null;                                    // return null or Stream.Null?
-
-            // Delete previous index page if we are moving along to the next
-            if (GetIndexPageIndex(_metaData.HeadIndex) != _headIndexPageIndex)
+            lock (_lockObject)
             {
-                _indexPageFactory.DeletePage(_headIndexPageIndex);
-                _headIndexPageIndex = GetIndexPageIndex(_metaData.HeadIndex);
+                if (_metaData.HeadIndex == _metaData.TailIndex)     // Head cought up with tail. Queue is empty.
+                    return null;                                    // return null or Stream.Null?
+
+                // Delete previous index page if we are moving along to the next
+                if (GetIndexPageIndex(_metaData.HeadIndex) != _headIndexPageIndex)
+                {
+                    _indexPageFactory.DeletePage(_headIndexPageIndex);
+                    _headIndexPageIndex = GetIndexPageIndex(_metaData.HeadIndex);
+                }
+
+                // Get index item for head index
+                var indexItem = GetIndexItem(_metaData.HeadIndex);
+
+                // Delete previous data page if we are moving along to the next
+                if (indexItem.DataPageIndex != _headDataPageIndex)
+                {
+                    _dataPageFactory.DeletePage(_headDataPageIndex);
+                    _headDataPageIndex = indexItem.DataPageIndex;
+                }
+
+                // Get data page
+                var dataPage = _dataPageFactory.GetPage(indexItem.DataPageIndex);
+
+                // Get read stream
+                MemoryStream memoryStream = new MemoryStream();
+                using (var readStream = dataPage.GetReadStream(indexItem.ItemOffset, indexItem.ItemLength))
+                {
+                    readStream.CopyTo(memoryStream, 4 * 1024);
+                    memoryStream.Position = 0;
+                }
+
+                _dataPageFactory.ReleasePage(dataPage.Index);
+
+                // Update meta data
+                if (_metaData.HeadIndex == long.MaxValue)
+                    _metaData.HeadIndex = 0;
+                else
+                    _metaData.HeadIndex++;
+
+                PersistMetaData();
+
+                return memoryStream;
             }
-
-            // Get index item for head index
-            var indexItem = GetIndexItem(_metaData.HeadIndex);
-
-            // Delete previous data page if we are moving along to the next
-            if (indexItem.DataPageIndex != _headDataPageIndex)
-            {
-                _dataPageFactory.DeletePage(_headDataPageIndex);
-                _headDataPageIndex = indexItem.DataPageIndex;
-            }
-
-            // Get data page
-            var dataPage = _dataPageFactory.GetPage(indexItem.DataPageIndex);
-
-            // Get read stream
-            MemoryStream memoryStream = new MemoryStream();
-            using (var readStream = dataPage.GetReadStream(indexItem.ItemOffset, indexItem.ItemLength))
-            {
-                readStream.CopyTo(memoryStream, 4*1024);
-                memoryStream.Position = 0;
-            }
-
-            _dataPageFactory.ReleasePage(dataPage.Index);
-
-            // Update meta data
-            if (_metaData.HeadIndex == long.MaxValue)
-                _metaData.HeadIndex = 0;
-            else
-                _metaData.HeadIndex++;
-
-            PersistMetaData();
-
-            return memoryStream;
         }
 
         public void Dispose()
