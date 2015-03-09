@@ -14,15 +14,15 @@ namespace TestApp
         static void Main(string[] args)
         {
             var q = new PersistentQueue.PersistentQueue(@"c:\temp\PersistentQueue", 10*1024*1024);
-            int items = 50000;
-            int threads = 1;
+            int items = 25000;
+            int threads = 5;
 
-            List<Task> taskList = new List<Task>();
+            List<Task<int>> taskList = new List<Task<int>>();
 
             var swOuter = Stopwatch.StartNew();
             for (int i = 0; i < threads; i++)
             {
-                taskList.Add(Task.Run(() => 
+                taskList.Add(Task.Run<int>(() => 
                 {
                     var swInner = Stopwatch.StartNew();
 
@@ -40,6 +40,8 @@ namespace TestApp
                         items,
                         swInner.ElapsedMilliseconds,
                         ((double)items / swInner.ElapsedMilliseconds) * 1000);
+
+                    return items;
                 }));
             }
 
@@ -47,17 +49,19 @@ namespace TestApp
             swOuter.Stop();
 
             Console.WriteLine("Enqueued totally {0} items in {1} ms ({2:0} items/s)",
-                items,
+                items*threads,
                 swOuter.ElapsedMilliseconds,
-                ((double)items / swOuter.ElapsedMilliseconds) * 1000);
+                (((double)items*threads) / swOuter.ElapsedMilliseconds) * 1000);
 
 
             swOuter.Reset();
             swOuter.Start();
 
+            taskList.Clear();
+
             for (int i = 0; i < threads; i++)
             {
-                taskList.Add(Task.Run(() =>
+                taskList.Add(Task.Run<int>(() =>
                 {
                     Stream stream;
                     int read = 0;
@@ -88,17 +92,18 @@ namespace TestApp
                         swInner.ElapsedMilliseconds,
                         ((double)read / swInner.ElapsedMilliseconds) * 1000);
 
+                    return read;
                 }));
             }
 
             Task.WaitAll(taskList.ToArray());
             swOuter.Stop();
 
-
+            var sum = taskList.Sum(t => t.Result);
             Console.WriteLine("Dequeued totally {0} items in {1} ms ({2:0} items/s)",
-                items,
+                sum,
                 swOuter.ElapsedMilliseconds,
-                ((double)items / swOuter.ElapsedMilliseconds) * 1000);
+                ((double)sum / swOuter.ElapsedMilliseconds) * 1000);
 
 
 
